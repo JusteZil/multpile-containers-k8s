@@ -1,0 +1,32 @@
+sudo: required
+services:
+  - docker
+env:
+  global:
+    - SHA=$(git rev-parse HEAD)
+    - CLOUDSDK_CORE_DISABLE_PROMPTS=1 # Google cloud CLI will not configure prompts
+before_install:
+  - openssl aes-256-cbc -K ....... # decrypt the encrypted service-account.json.enc file
+  - curl https://sdk.cloud.google.com | bash > /dev/null; # download google cloud SDK and install it on travis machine
+  - source $HOME/google-cloud-sdk/path.bash.inc
+  - gcloud components update kubectl # install kubectl on travis machine
+  # authenticate to Google Cloud with credentials provided in service.account.json file
+  - gcloud auth activate-service-account --key-file service-account.json # this file is unencrypted by travis
+  - gcloud config set project <project_id> # connect to Google Cloud project 
+  - gcloud config set compute/zone <zone> # specify compute zone
+  - gcloud container clusters get-credentials <cluster_name> # specify Kubernetes cluster to work with
+  - echo "$DOCKER_PASSWORD" | docker logi -u "$DOCKER_USERNAME" --password-stdin # login to docker hub
+  - docker build -t kreekeris/react-test -f ./client/Dockerfile.dev ./client
+
+script:
+  - docker run -e CI=true USERNAME/docker-react npm test
+
+deploy:
+  provider: script
+  script: bash ./deploy.sh
+  on:
+    branch: master
+
+
+
+
